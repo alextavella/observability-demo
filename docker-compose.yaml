@@ -1,0 +1,97 @@
+services:
+  frontend:
+    build:
+      context: .
+    command: ["./main", "frontend"]
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=frontend
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: .
+    command: ["./main", "backend"]
+    ports:
+      - "8081:8081"
+    environment:
+      - GIN_MODE=release
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=backend
+    depends_on:
+      - producer
+
+  producer:
+    build:
+      context: .
+    command: ["./main", "producer"]
+    ports:
+      - "8082:8082"
+    environment:
+      - GIN_MODE=release
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=producer
+    depends_on:
+      - consumer
+
+  consumer:
+    build:
+      context: .
+    command: ["./main", "consumer"]
+    depends_on:
+      - kafka
+    environment:
+      - GIN_MODE=release
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=consumer
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG4J_ROOT_LOGLEVEL: INFO
+      KAFKA_LOG4J_LOGGERS: 'kafka=WARN,kafka.controller=WARN,kafka.log.LogCleaner=WARN,state.change.logger=WARN,kafka.producer.async.DefaultEventHandler=WARN'
+    depends_on:
+      - zookeeper
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config", "/etc/otel-collector-config.yaml"]
+    ports:
+      - "4318:4318" # OTLP HTTP receiver
+      - "8889:8889" # Prometheus exporter
+    depends_on:
+      - zipkin
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    ports:
+      - "9411:9411"
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus.yaml
+    command: ["--config.file=/etc/prometheus.yaml"]
+    depends_on:
+      - otel-collector
