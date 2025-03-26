@@ -9,6 +9,7 @@ import (
 	otelkafkakonsumer "github.com/Trendyol/otel-kafka-konsumer"
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
@@ -55,6 +56,13 @@ func processMessage(reader *otelkafkakonsumer.Reader, message *kafka.Message) {
 
 	time.Sleep(100 * time.Millisecond)
 
+	ctx := reader.TraceConfig.Propagator.Extract(context.Background(), otelkafkakonsumer.NewMessageCarrier(message))
+
+	t := otel.GetTracer()
+	_, span := t.Start(ctx, "process message")
+	time.Sleep(200 * time.Millisecond)
+	defer span.End()
+
 	// Process the message
 	v := string(message.Value)
 
@@ -62,9 +70,11 @@ func processMessage(reader *otelkafkakonsumer.Reader, message *kafka.Message) {
 
 	if v != "" {
 		counter.Add(context.Background(), 1, metric.WithAttributes(attribute.Bool("success", true)))
+		span.SetStatus(codes.Ok, "Success")
 		fmt.Println("Success!")
 	} else {
 		counter.Add(context.Background(), 1, metric.WithAttributes(attribute.Bool("success", false)))
+		span.SetStatus(codes.Error, "Failure")
 		fmt.Println("Failure!")
 	}
 
