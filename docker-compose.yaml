@@ -1,4 +1,5 @@
 services:
+  # Apps
   frontend:
     build:
       context: .
@@ -8,8 +9,6 @@ services:
     environment:
       - GIN_MODE=release
       - OTEL_RESOURCE_ATTRIBUTES=service.name=frontend
-    depends_on:
-      - backend
 
   backend:
     build:
@@ -20,8 +19,6 @@ services:
     environment:
       - GIN_MODE=release
       - OTEL_RESOURCE_ATTRIBUTES=service.name=backend
-    depends_on:
-      - producer
 
   producer:
     build:
@@ -32,19 +29,16 @@ services:
     environment:
       - GIN_MODE=release
       - OTEL_RESOURCE_ATTRIBUTES=service.name=producer
-    depends_on:
-      - consumer
 
   consumer:
     build:
       context: .
     command: ["./main", "consumer"]
-    depends_on:
-      - kafka
     environment:
       - GIN_MODE=release
       - OTEL_RESOURCE_ATTRIBUTES=service.name=consumer
 
+  # Infra
   kafka:
     image: confluentinc/cp-kafka:latest
     ports:
@@ -70,6 +64,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
+  # Observability
   otel-collector:
     image: otel/opentelemetry-collector:latest
     volumes:
