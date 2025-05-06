@@ -1,0 +1,5 @@
+### Frontend [failure]
+GET http://localhost:8080
+
+### Frontend [success]
+GET http://localhost:8080?v=123
